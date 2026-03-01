@@ -1,0 +1,9 @@
+{
+  "best_model": "RandomForest",
+  "selection_metric": "accuracy",
+  "models": {
+    "RandomForest": {
+      "accuracy": 0.8553846153846154
+    }
+  }
+}

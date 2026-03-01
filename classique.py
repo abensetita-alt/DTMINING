@@ -8,7 +8,7 @@ import numpy as np
 from IPython.display import display
 
 import os
-os.environ["MPLBACKEND"] = "Agg"  # pas de fenêtre GUI (important pour le correcteur)
+os.environ["MPLBACKEND"] = "Agg"  # pas de fenêtre 
 
 BASE_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.join(BASE_DIR, "outputs")
@@ -28,16 +28,20 @@ white_wine = pd.read_csv(
 print("Red wine shape:", red_wine.shape)
 print("White wine shape:", white_wine.shape)
 
+
+
+# =========================
 ## Chargement et Préparation des Données
+# =========================
 
 red_wine_df = red_wine.copy()
 white_wine_df = white_wine.copy()
 
-# Add 'wine_type' column (0 for red, 1 for white)
+# Ajout de la colonne 'wine_type' (0 pour le rouge, 1 pour le Blanc)
 red_wine_df['wine_type'] = 0
 white_wine_df['wine_type'] = 1
 
-# Combine the datasets
+# Combinaison des deux datasets
 wine_df = pd.concat([red_wine_df, white_wine_df], ignore_index=True)
 
 # Regroupement des classes en 3 catégories
@@ -51,22 +55,23 @@ def categorize_quality(q):
 
 wine_df['quality_grouped'] = wine_df['quality'].apply(categorize_quality)
 
-# Define features (X) and target (y)
+# Définition des variables explicatives (X) et la variable cible (y)
 X = wine_df.drop(['quality', 'quality_grouped'], axis=1)
 y = wine_df['quality_grouped']
 
 
-
-print("Shape of combined DataFrame (wine_df):", wine_df.shape)
-print("Shape of features (X):", X.shape)
-print("Shape of target (y):", y.shape)
-print("First 5 rows of X:")
+print("Forme du DataFrame combiné (wine_df):", wine_df.shape)
+print("Forme des variables explicatives (X) :", X.shape)
+print("Forme de la variable cible (y):", y.shape)
+print("5 premières lignes de X:")
 print(X.head())
-print("First 5 values of y:")
+print("5 premières lignes de y:")
 print(y.head())
 
 
+# =========================
 ## Division des Données en Ensembles d'Entraînement et de Test
+# =========================
 
 from sklearn.model_selection import train_test_split
 
@@ -77,31 +82,33 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
+print("Structure de X_train:", X_train.shape)
+print("Structure de X_test:", X_test.shape)
+print("Structure de y_train:", y_train.shape)
+print("Structure de y_test:", y_test.shape)
 
 
-print("Shape of X_train:", X_train.shape)
-print("Shape of X_test:", X_test.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of y_test:", y_test.shape)
-
-
+# =========================
 ## Optimisation et Évaluation du Classificateur Arbre de Décision
+# =========================
 
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
-# Define the parameter grid for Decision Tree Classifier
+# Definition des paramètres à tester pour l'Arbre de Décision
 param_grid = {
     'max_depth': [3, 5, 7, 10, None],
     'min_samples_split': [2, 5, 10],
     'min_samples_leaf': [1, 2, 4]
 }
 
-# Initialize StratifiedKFold for cross-validation
-# quality (target variable) has imbalanced classes, so StratifiedKFold is appropriate.
-# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples.
+# Initialiser StratifiedKFold pour la validation croisée.
+# n_splits est ajusté à 5 pour éviter l’avertissement concernant la 'classe la moins représentée',
+
 strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# La variable cible (quality) est déséquilibrée, donc StratifiedKFold est la méthode appropriée.
 
 # Initialize GridSearchCV
 grid_search_dtc = GridSearchCV(
@@ -133,7 +140,9 @@ print("\nOptimized Decision Tree Classifier Classification Report:")
 print(classification_report(y_test, y_pred_best_dtc, zero_division=0))
 
 
+# =========================
 ## Optimisation et Évaluation du Classificateur Forêt Aléatoire
+# =========================
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
@@ -147,11 +156,12 @@ param_grid = {
     'min_samples_leaf': [1, 2]
 }
 
-# Initialize StratifiedKFold for cross-validation
-# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples in y_train.
+# Initialisation de StratifiedKFold pour la validation croisée.
+# n_splits est ajusté à 5 pour éviter l’avertissement concernant la 'classe la moins représentée',
+
 strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-# Initialize GridSearchCV
+# Initialisation GridSearchCV
 grid_search_rfc = GridSearchCV(
     estimator=RandomForestClassifier(random_state=42),
     param_grid=param_grid,
@@ -161,16 +171,16 @@ grid_search_rfc = GridSearchCV(
     verbose=1
 )
 
-# Fit GridSearchCV to the training data
+# Entraînement de GridSearchCV sur les données d'entraînement
 grid_search_rfc.fit(X_train, y_train)
 
-# Print the best parameters found
-print("Best parameters for Random Forest Classifier:", grid_search_rfc.best_params_)
+# Affichage des meilleurs paramètres trouvés
+print("Meilleurs paramètres pour le Random Forest Classifie:", grid_search_rfc.best_params_)
 
-# Get the best estimator
+# Récupérer le meilleur estimateur
 best_rfc = grid_search_rfc.best_estimator_
 
-# Make predictions on the test set using the best estimator
+# Faire des prédictions sur l'ensemble de test avec le meilleur modèle
 y_pred_best_rfc = best_rfc.predict(X_test)
 
 # Evaluer le meilleur modèle
@@ -181,7 +191,9 @@ print("\nOptimized Random Forest Classifier Classification Report:")
 print(classification_report(y_test, y_pred_best_rfc, zero_division=0))
 
 
-## Optimisation et Évaluation du Classificateur K-Plus Proches Voisins (KNN)
+# =========================
+# Optimisation et Évaluation du Classificateur K-Plus Proches Voisins (KNN)
+# =========================
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
@@ -199,11 +211,11 @@ X_test_scaled = scaler.transform(X_test)
 param_grid = {
     'n_neighbors': [3, 5, 7, 9],
     'weights': ['uniform', 'distance'],
-    'p': [1, 2] # 1 for Manhattan distance, 2 for Euclidean distance
+    'p': [1, 2] # 1 pour Manhattan distance, 2 pour Euclidean distance
 }
 
 # Initialisation de StratifiedKFold pour cross-validation
-# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples in y_train.
+# n_splits est ajusté à 5 pour éviter l’avertissement concernant la 'classe la moins représentée',
 strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 # Initialisation de GridSearchCV
@@ -212,7 +224,7 @@ grid_search_knn = GridSearchCV(
     param_grid=param_grid,
     cv=strat_kfold,
     scoring='accuracy',
-    n_jobs=-1, # Use all available cores
+    n_jobs=-1, 
     verbose=1
 )
 
@@ -235,7 +247,10 @@ print(f"\nOptimized K-Nearest Neighbors Classifier Accuracy: {accuracy_best_knn:
 print("\nOptimized K-Nearest Neighbors Classifier Classification Report:")
 print(classification_report(y_test, y_pred_best_knn, zero_division=0))
 
-#Affichage des performances des 3 modèles 
+
+# =========================
+# Affichage des performances des 3 meilleurs modèles 
+# =========================
 
 print("\nOptimized Decision Tree Classifier Classification Report:")
 print(classification_report(y_test, y_pred_best_dtc, zero_division=0))
@@ -309,9 +324,6 @@ import time, sys
 import numpy as np
 import pandas as pd
 
-# (Décommente si besoin)
-# y_pred_best_rfc = best_rfc.predict(X_test)
-
 t0 = time.perf_counter()
 print("[CHK] Début bloc comparaison"); sys.stdout.flush()
 
@@ -329,19 +341,19 @@ wine_type = X_test.reindex(idx)["wine_type"].to_numpy()
 t1 = time.perf_counter()
 print(f"[TIMING] Préparation des séries : {t1 - t0:.3f}s"); sys.stdout.flush()
 
-# -- Construction du tableau enrichi (sans alignements implicites)
+# Construction du tableau enrichi (sans alignements implicites)
 comparison_df_enhanced = pd.DataFrame({
     "Vraie Qualité": y_test_ser,       # labels 0/1/2
     "Qualité Prédite": y_pred_ser,     # labels 0/1/2
     "Type de Vin": wine_type           # 0/1
 }, index=idx)
 
-# -- Catégorisation par mapping direct (PAS de pd.cut)
+# Catégorisation par mapping direct (PAS de pd.cut)
 label_map = {0: "Mauvaise", 1: "Moyenne", 2: "Bonne"}
 comparison_df_enhanced["Catégorie Vraie"] = comparison_df_enhanced["Vraie Qualité"].map(label_map)
 comparison_df_enhanced["Catégorie Prédite"] = comparison_df_enhanced["Qualité Prédite"].map(label_map)
 
-# -- Exactitude booléenne
+# Exactitude booléenne
 comparison_df_enhanced["Catégorie Correcte"] = (
     comparison_df_enhanced["Catégorie Vraie"] == comparison_df_enhanced["Catégorie Prédite"]
 )
@@ -349,12 +361,12 @@ comparison_df_enhanced["Catégorie Correcte"] = (
 t2 = time.perf_counter()
 print(f"[TIMING] Construction + catégorisation : {t2 - t1:.3f}s"); sys.stdout.flush()
 
-# -- Affichage formaté exactement comme désiré
+# Affichage formaté exactement comme désiré
 print("Comparaison des Prédictions du Modèle Random Forest (tableau enrichi) :")
 with pd.option_context('display.max_rows', 20, 'display.max_columns', 20, 'display.width', 160):
     print(comparison_df_enhanced.head(20).to_string(index=True))
 
-# -- Métriques catégorie
+# Métriques catégorie
 category_accuracy = comparison_df_enhanced["Catégorie Correcte"].mean()
 print(f"\nPrécision de la Catégorie (Mauvaise/Moyenne/Bonne) : {category_accuracy:.2f}\n")
 
@@ -365,3 +377,26 @@ print(acc_by_type)
 t3 = time.perf_counter()
 print(f"[TIMING] Affichages + métriques : {t3 - t2:.3f}s")
 print(f"[TIMING] Total bloc comparaison : {t3 - t0:.3f}s"); sys.stdout.flush()
+
+# =========================
+# EXPORT pour comparaison
+# =========================
+
+import json
+
+export_payload = {
+    "best_model": "RandomForest",
+    "selection_metric": "accuracy",
+    "models": {
+        "RandomForest": {
+            "accuracy": float(accuracy_best_rfc)
+        }
+    }
+}
+
+classic_json_path = os.path.join(OUT_DIR, "classic_metrics.json")
+
+with open(classic_json_path, "w", encoding="utf-8") as f:
+    json.dump(export_payload, f, ensure_ascii=False, indent=2)
+
+print(f"[EXPORT] RandomForest (accuracy) exporté pour comparaison : {classic_json_path}")

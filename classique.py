@@ -40,9 +40,22 @@ white_wine_df['wine_type'] = 1
 # Combine the datasets
 wine_df = pd.concat([red_wine_df, white_wine_df], ignore_index=True)
 
+# Regroupement des classes en 3 catégories
+def categorize_quality(q):
+    if q <= 4:
+        return 0   # Mauvaise
+    elif q <= 6:
+        return 1   # Moyenne
+    else:
+        return 2   # Bonne
+
+wine_df['quality_grouped'] = wine_df['quality'].apply(categorize_quality)
+
 # Define features (X) and target (y)
-X = wine_df.drop('quality', axis=1)
-y = wine_df['quality']
+X = wine_df.drop(['quality', 'quality_grouped'], axis=1)
+y = wine_df['quality_grouped']
+
+
 
 print("Shape of combined DataFrame (wine_df):", wine_df.shape)
 print("Shape of features (X):", X.shape)
@@ -57,7 +70,14 @@ print(y.head())
 
 from sklearn.model_selection import train_test_split
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+
 
 print("Shape of X_train:", X_train.shape)
 print("Shape of X_test:", X_test.shape)
@@ -80,8 +100,8 @@ param_grid = {
 
 # Initialize StratifiedKFold for cross-validation
 # quality (target variable) has imbalanced classes, so StratifiedKFold is appropriate.
-# Adjusted n_splits to 2 to avoid 'least populated class' warning, as the smallest class has 2 samples.
-strat_kfold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples.
+strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 # Initialize GridSearchCV
 grid_search_dtc = GridSearchCV(
@@ -128,8 +148,8 @@ param_grid = {
 }
 
 # Initialize StratifiedKFold for cross-validation
-# Adjusted n_splits to 2 to avoid 'least populated class' warning, as the smallest class has 2 samples in y_train.
-strat_kfold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples in y_train.
+strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 # Initialize GridSearchCV
 grid_search_rfc = GridSearchCV(
@@ -183,8 +203,8 @@ param_grid = {
 }
 
 # Initialisation de StratifiedKFold pour cross-validation
-# Adjusted n_splits to 2 to avoid 'least populated class' warning, as the smallest class has 2 samples in y_train.
-strat_kfold = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+# Adjusted n_splits to 5 to avoid 'least populated class' warning, as the smallest class has 5 samples in y_train.
+strat_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 # Initialisation de GridSearchCV
 grid_search_knn = GridSearchCV(
@@ -281,94 +301,67 @@ print(f"[PLOT] Figure enregistrée : {out_path}")
 
 plt.close()
 
-###Tableau comparatif des prédictions du modéle Random Forest
 
-import sys, time
+# =========================
+# Comparaison des Prédictions du Modèle Random Forest
+# =========================
+import time, sys
+import numpy as np
 import pandas as pd
 
-def categorize_quality(quality_score):
-    if quality_score <= 4:
-        return 'Mauvaise'
-    elif quality_score <= 6:
-        return 'Moyenne'
-    else:
-        return 'Bonne'
+# (Décommente si besoin)
+# y_pred_best_rfc = best_rfc.predict(X_test)
 
 t0 = time.perf_counter()
 print("[CHK] Début bloc comparaison"); sys.stdout.flush()
 
-# --- 1) Sécuriser index/tailles pour éviter un alignement coûteux
-# On force tout sur le même index, celui de y_test
+# -- Préparation des séries (alignement sûr des index)
 idx = getattr(y_test, "index", None)
 if idx is None:
-    # y_test est peut-être un ndarray -> on fabrique un RangeIndex cohérent
     idx = pd.RangeIndex(start=0, stop=len(y_test), step=1)
 
-# Convertir les prédictions en Series avec le même index
-if not isinstance(y_pred_best_rfc, pd.Series):
-    y_pred_ser = pd.Series(y_pred_best_rfc, index=idx, name="Qualité Prédite")
-else:
-    # Réindexer pour correspondre
-    y_pred_ser = y_pred_best_rfc.reindex(idx)
+y_test_ser = pd.Series(np.asarray(y_test), index=idx, name="Vraie Qualité")
+y_pred_ser = pd.Series(np.asarray(y_pred_best_rfc), index=idx, name="Qualité Prédite")
 
-# y_test en Series (si besoin) + réindexage
-if not isinstance(y_test, pd.Series):
-    y_test_ser = pd.Series(y_test, index=idx, name="Vraie Qualité")
-else:
-    y_test_ser = y_test.reindex(idx).rename("Vraie Qualité")
-
-# Récupération sûre du type de vin depuis X_test
-# - On reindexe sur idx pour être aligné
-# - .to_numpy() évite de propager l'index lors de l'assignation
+# Récupérer le type de vin (0=rouge, 1=blanc) aligné
 wine_type = X_test.reindex(idx)["wine_type"].to_numpy()
 
 t1 = time.perf_counter()
 print(f"[TIMING] Préparation des séries : {t1 - t0:.3f}s"); sys.stdout.flush()
 
-# --- 2) Construction du DataFrame sans alignements implicites
+# -- Construction du tableau enrichi (sans alignements implicites)
 comparison_df_enhanced = pd.DataFrame({
-    'Vraie Qualité': y_test_ser,
-    'Qualité Prédite': y_pred_ser,
-    'Type de Vin': wine_type
+    "Vraie Qualité": y_test_ser,       # labels 0/1/2
+    "Qualité Prédite": y_pred_ser,     # labels 0/1/2
+    "Type de Vin": wine_type           # 0/1
 }, index=idx)
 
-# --- 3) Catégorisation (vectorisée donc rapide)
-comparison_df_enhanced['Catégorie Vraie'] = pd.cut(
-    comparison_df_enhanced['Vraie Qualité'],
-    bins=[-float("inf"), 4, 6, float("inf")],
-    labels=['Mauvaise', 'Moyenne', 'Bonne'],
-    right=True
-)
-comparison_df_enhanced['Catégorie Prédite'] = pd.cut(
-    comparison_df_enhanced['Qualité Prédite'],
-    bins=[-float("inf"), 4, 6, float("inf")],
-    labels=['Mauvaise', 'Moyenne', 'Bonne'],
-    right=True
-)
+# -- Catégorisation par mapping direct (PAS de pd.cut)
+label_map = {0: "Mauvaise", 1: "Moyenne", 2: "Bonne"}
+comparison_df_enhanced["Catégorie Vraie"] = comparison_df_enhanced["Vraie Qualité"].map(label_map)
+comparison_df_enhanced["Catégorie Prédite"] = comparison_df_enhanced["Qualité Prédite"].map(label_map)
 
-comparison_df_enhanced['Catégorie Correcte'] = (
-    comparison_df_enhanced['Catégorie Vraie'] == comparison_df_enhanced['Catégorie Prédite']
+# -- Exactitude booléenne
+comparison_df_enhanced["Catégorie Correcte"] = (
+    comparison_df_enhanced["Catégorie Vraie"] == comparison_df_enhanced["Catégorie Prédite"]
 )
 
 t2 = time.perf_counter()
 print(f"[TIMING] Construction + catégorisation : {t2 - t1:.3f}s"); sys.stdout.flush()
 
-# --- 4) Affichage rapide et non bloquant (éviter IPython.display dans un .py)
+# -- Affichage formaté exactement comme désiré
 print("Comparaison des Prédictions du Modèle Random Forest (tableau enrichi) :")
 with pd.option_context('display.max_rows', 20, 'display.max_columns', 20, 'display.width', 160):
-    print(comparison_df_enhanced.head(20).to_string())
-sys.stdout.flush()
+    print(comparison_df_enhanced.head(20).to_string(index=True))
 
-# --- 5) Résumés
-correct_category_predictions = comparison_df_enhanced['Catégorie Correcte'].sum()
-total_predictions = len(comparison_df_enhanced)
-category_accuracy = correct_category_predictions / total_predictions
-print(f"\nPrécision de la Catégorie (Mauvaise/Moyenne/Bonne) : {category_accuracy:.2f}")
-print("\nPrécision de la Catégorie par Type de Vin :")
-print(comparison_df_enhanced.groupby('Type de Vin', observed=True)['Catégorie Correcte'].mean())
-sys.stdout.flush()
+# -- Métriques catégorie
+category_accuracy = comparison_df_enhanced["Catégorie Correcte"].mean()
+print(f"\nPrécision de la Catégorie (Mauvaise/Moyenne/Bonne) : {category_accuracy:.2f}\n")
+
+print("Précision de la Catégorie par Type de Vin :")
+acc_by_type = comparison_df_enhanced.groupby("Type de Vin", observed=True)["Catégorie Correcte"].mean()
+print(acc_by_type)
 
 t3 = time.perf_counter()
-print(f"[TIMING] Affichages + métriques : {t3 - t2:.3f}s"); sys.stdout.flush()
+print(f"[TIMING] Affichages + métriques : {t3 - t2:.3f}s")
 print(f"[TIMING] Total bloc comparaison : {t3 - t0:.3f}s"); sys.stdout.flush()
-

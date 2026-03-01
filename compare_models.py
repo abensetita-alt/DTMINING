@@ -28,7 +28,7 @@ def load_json(path: str) -> dict:
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"Fichier introuvable : {path}\n"
-            f"➡️ Vérifie que tu as bien exécuté les scripts qui créent ce JSON."
+            f"Vérification de l'éxécution JSON"
         )
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)

@@ -1,4 +1,3 @@
-# src/neural_network.py
 
 import torch
 import torch.nn as nn
@@ -18,7 +17,6 @@ def get_activation(name: str):
 class MLPClassifier(nn.Module):
     """
     MLP (Multi-Layer Perceptron) pour classification multi-classes.
-    - Sortie = logits (pas de softmax ici) car CrossEntropyLoss l'intègre.
     """
 
     def __init__(

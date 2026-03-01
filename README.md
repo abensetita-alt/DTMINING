@@ -1,6 +1,6 @@
 # Classification de la qualité des vins – Étude comparative (Machine Learning vs Deep Learning)
 
-## 📌 Présentation du projet
+## Présentation globale du projet
 
 Ce projet vise à prédire la qualité des vins à partir de leurs caractéristiques physico-chimiques, en utilisant le dataset *Wine Quality* issu du repository UCI Machine Learning.
 
@@ -13,7 +13,7 @@ L’analyse ne se limite pas à l’accuracy globale, mais intègre également l
 
 ---
 
-## 🎯 Objectifs
+## Objectifs
 
 - Transformer la note de qualité initiale en un problème de classification à 3 classes
 - Optimiser les modèles classiques via validation croisée et recherche d’hyperparamètres
@@ -26,7 +26,7 @@ L’analyse ne se limite pas à l’accuracy globale, mais intègre également l
 
 ---
 
-## 📊 Jeu de données
+## Jeu de données
 
 Source : UCI Machine Learning Repository  
 Dataset : Wine Quality (vins rouges et blancs)
@@ -44,9 +44,9 @@ La variable cible originale (*quality*) a été regroupée en trois catégories 
 
 ---
 
-## ⚙️ Méthodologie
+## Méthodologie
 
-### 🔹 Modèles de Machine Learning Classiques
+### Modèles de Machine Learning Classiques
 
 - Decision Tree (GridSearchCV, validation croisée stratifiée 5-fold)
 - Random Forest (GridSearchCV, validation croisée stratifiée 5-fold)
@@ -59,7 +59,7 @@ avec stratification des classes.
 
 ---
 
-### 🔹 Approche Deep Learning (MLP – PyTorch)
+### Approche Deep Learning (MLP – PyTorch)
 
 - Architecture entièrement connectée
 - Fonction de perte : CrossEntropyLoss
@@ -78,7 +78,7 @@ Standardisation des variables via `StandardScaler` (ajusté uniquement sur l’e
 
 ---
 
-## 📈 Résultats principaux
+## Résultats principaux
 
 | Modèle | Accuracy |
 |--------|----------|

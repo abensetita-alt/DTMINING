@@ -1,4 +1,8 @@
 # src/train.py
+#commandes à mettre pour éxécuter :
+# python train.py 
+#et
+#python train.py --class weights
 
 import argparse
 import json

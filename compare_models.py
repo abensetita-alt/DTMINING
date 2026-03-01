@@ -36,7 +36,7 @@ def load_json(path: str) -> dict:
 
 def extract_accuracy(metrics_obj: dict) -> float:
     """
-    Récupère l'accuracy depuis un JSON de métriques.
+    Récupère l'accuracy depuis JSON de métriques.
     """
     if "accuracy" in metrics_obj:
         return float(metrics_obj["accuracy"])
@@ -67,11 +67,11 @@ classic_best_name = classic.get("best_model", "RandomForest")
 classic_models = classic.get("models", {})
 
 if classic_best_name not in classic_models:
-    # fallback si jamais le JSON ne contient pas best_model correctement
+
     if "RandomForest" in classic_models:
         classic_best_name = "RandomForest"
     else:
-        # dernier fallback : prendre le 1er modèle trouvé
+
         if len(classic_models) == 0:
             raise KeyError("classic_metrics.json ne contient pas de clé 'models' exploitable.")
         classic_best_name = list(classic_models.keys())[0]
@@ -86,8 +86,19 @@ classic_acc = extract_accuracy(classic_best_metrics)
 dl_nocw = load_json(DL_JSON_NOCW)
 dl_cw = load_json(DL_JSON_CW)
 
-dl_acc_nocw = extract_accuracy(dl_nocw)
-dl_acc_cw = extract_accuracy(dl_cw)
+#DL nocw
+dl_nocw_best = dl_nocw.get("best_model")
+dl_nocw_models = dl_nocw.get("models", {})
+if dl_nocw_best not in dl_nocw_models:
+    dl_nocw_best = list(dl_nocw_models.keys())[0]  # fallback
+dl_acc_nocw = extract_accuracy(dl_nocw_models[dl_nocw_best])
+
+#DL cw
+dl_cw_best = dl_cw.get("best_model")
+dl_cw_models = dl_cw.get("models", {})
+if dl_cw_best not in dl_cw_models:
+    dl_cw_best = list(dl_cw_models.keys())[0]  # fallback
+dl_acc_cw = extract_accuracy(dl_cw_models[dl_cw_best])
 
 
 

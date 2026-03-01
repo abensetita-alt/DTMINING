@@ -1,6 +1,9 @@
+# src/train.py
+
 import argparse
-import os
 import json
+import os
+
 import numpy as np
 import pandas as pd
 import torch
@@ -14,9 +17,11 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
-    f1_score,
+    accuracy_score,
     balanced_accuracy_score,
+    f1_score,
 )
+from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 
 from preprocessing import load_combined_wine_data, prepare_data, split_and_scale
@@ -104,18 +109,17 @@ def build_criterion(y_train, device, use_class_weights: bool):
     return nn.CrossEntropyLoss(weight=class_weights_t), class_weights
 
 
-def ensure_outputs_dir():
+def ensure_dirs():
     os.makedirs("outputs", exist_ok=True)
+    os.makedirs("models", exist_ok=True)
 
 
 def plot_training_curves(history_df: pd.DataFrame, out_path: str):
     fig = plt.figure(figsize=(10, 6))
-
     plt.plot(history_df["epoch"], history_df["train_loss"], label="train_loss")
     plt.plot(history_df["epoch"], history_df["val_loss"], label="val_loss")
     plt.plot(history_df["epoch"], history_df["train_acc"], label="train_acc")
     plt.plot(history_df["epoch"], history_df["val_acc"], label="val_acc")
-
     plt.xlabel("Epoch")
     plt.ylabel("Valeur")
     plt.title("Courbes d'entraînement (loss et accuracy)")
@@ -146,20 +150,30 @@ def plot_confusion_matrix(cm: np.ndarray, out_path: str, class_names):
     plt.close(fig)
 
 
-def export_dl_metrics_json(out_path: str, te_loss: float, te_acc: float, y_true: np.ndarray, y_pred: np.ndarray):
+def export_dl_metrics_json(out_path: str, y_true, y_pred, model_name: str, selection_metric: str = "accuracy"):
     cm = confusion_matrix(y_true, y_pred)
     metrics = {
-        "loss": float(te_loss),
-        "accuracy": float(te_acc),
-        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
-        "macro_f1": float(f1_score(y_true, y_pred, average="macro")),
-        "weighted_f1": float(f1_score(y_true, y_pred, average="weighted")),
-        "confusion_matrix": cm.tolist(),
-        "classification_report": classification_report(y_true, y_pred, output_dict=True, zero_division=0),
+        "best_model": model_name,
+        "selection_metric": selection_metric,
+        "models": {
+            model_name: {
+                "accuracy": float(accuracy_score(y_true, y_pred)),
+                "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+                "macro_f1": float(f1_score(y_true, y_pred, average="macro")),
+                "weighted_f1": float(f1_score(y_true, y_pred, average="weighted")),
+                "confusion_matrix": cm.tolist(),
+                "classification_report": classification_report(
+                    y_true,
+                    y_pred,
+                    output_dict=True,
+                    zero_division=0
+                ),
+            }
+        }
     }
+
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
-    print("[EXPORT] DL metrics saved to:", os.path.abspath(out_path))
 
 
 def main():
@@ -177,23 +191,23 @@ def main():
     args = parser.parse_args()
 
     set_seed(args.seed)
-    ensure_outputs_dir()
+    ensure_dirs()
 
-    # Charger dataset combiné + préparer X/y
+    # ===== 1) Charger dataset combiné + préparer X/y =====
     df = load_combined_wine_data().reset_index(drop=True)
-    X, y = prepare_data(df)
+    X, y = prepare_data(df)  # y = quality_grouped (0/1/2)
+
     wine_type_all = df["wine_type"].astype(int).copy()
 
-    # Split + scaling
+    # ===== 2) Split + scaling (IMPORTANT : on passe bien X ET y) =====
     X_train, X_val, X_test, y_train, y_val, y_test, _ = split_and_scale(X, y)
 
-    # Refaire le split d'indices (pour produire un CSV test lisible)
-    from sklearn.model_selection import train_test_split
+    # Pour exporter un CSV des prédictions test avec wine_type, on refait le split sur indices
     idx = np.arange(len(y))
     idx_train, idx_test = train_test_split(idx, test_size=0.2, random_state=42, stratify=y)
     idx_train, idx_val = train_test_split(idx_train, test_size=0.2, random_state=42, stratify=y.iloc[idx_train])
 
-    #DataLoaders
+    # ===== 3) DataLoaders =====
     X_train_t, y_train_t = to_tensor(X_train, y_train)
     X_val_t, y_val_t = to_tensor(X_val, y_val)
     X_test_t, y_test_t = to_tensor(X_test, y_test)
@@ -202,7 +216,7 @@ def main():
     val_loader = DataLoader(TensorDataset(X_val_t, y_val_t), batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(TensorDataset(X_test_t, y_test_t), batch_size=args.batch_size, shuffle=False)
 
-    # Modèle 
+    # ===== 4) Modèle =====
     hidden_units = tuple(int(x.strip()) for x in args.hidden.split(",") if x.strip())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -215,11 +229,11 @@ def main():
         batch_norm=args.batch_norm,
     ).to(device)
 
-    #Loss + Optim
+    # ===== 5) Loss + Optim =====
     criterion, _ = build_criterion(y_train, device, use_class_weights=args.class_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    #Entraînement + early stoppin
+    # ===== 6) Entraînement + early stopping =====
     history = []
     best_val_loss = float("inf")
     best_state = None
@@ -229,7 +243,9 @@ def main():
         tr_loss, tr_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         va_loss, va_acc, _, _ = evaluate(model, val_loader, criterion, device)
 
-        history.append({"epoch": epoch, "train_loss": tr_loss, "train_acc": tr_acc, "val_loss": va_loss, "val_acc": va_acc})
+        history.append(
+            {"epoch": epoch, "train_loss": tr_loss, "train_acc": tr_acc, "val_loss": va_loss, "val_acc": va_acc}
+        )
 
         print(
             f"[COMBINED] Epoch {epoch:03d} "
@@ -250,7 +266,7 @@ def main():
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    # Test final + métriques
+    # ===== 7) Test final + métriques =====
     te_loss, te_acc, y_true, y_pred = evaluate(model, test_loader, criterion, device)
 
     print("\n===== TEST FINAL (COMBINED) =====")
@@ -270,7 +286,7 @@ def main():
         )
     )
 
-    #Sauvegardes outputs
+    # ===== 8) Sauvegardes outputs =====
     suffix = "cw" if args.class_weights else "nocw"
 
     history_df = pd.DataFrame(history)
@@ -283,6 +299,7 @@ def main():
     cm_fig = f"outputs/dl_confusion_matrix_{suffix}.png"
     plot_confusion_matrix(cm, cm_fig, class_names=[LABEL_NAMES[0], LABEL_NAMES[1], LABEL_NAMES[2]])
 
+    # CSV prédictions test (avec wine_type)
     df_test = pd.DataFrame({
         "index": idx_test,
         "wine_type": wine_type_all.iloc[idx_test].to_numpy(),
@@ -296,22 +313,27 @@ def main():
     pred_csv = f"outputs/dl_test_predictions_{suffix}.csv"
     df_test.to_csv(pred_csv, index=False)
 
-    
-    metrics_json = f"outputs/dl_metrics_{suffix}.json"
-    export_dl_metrics_json(metrics_json, te_loss, te_acc, y_true, y_pred)
-
-    # Sauvegarde modèle
-    os.makedirs("models", exist_ok=True)
+    # Modèle
     model_path = f"models/mlp_combined_{suffix}.pt"
     torch.save(model.state_dict(), model_path)
+
+    # JSON metrics POUR compare_models.py (noms simples et stables)
+    metrics_json = f"outputs/dl_metrics_{suffix}.json"
+    export_dl_metrics_json(
+        out_path=metrics_json,
+        y_true=y_true,
+        y_pred=y_pred,
+        model_name=f"MLP_{suffix}",
+        selection_metric="accuracy",
+    )
 
     print("\n===== OUTPUTS SAUVEGARDÉS =====")
     print("Historique :", history_csv)
     print("Courbes :", training_fig)
     print("Matrice confusion :", cm_fig)
     print("Prédictions test :", pred_csv)
-    print("Métriques JSON :", metrics_json)
     print("Modèle :", model_path)
+    print("Métriques JSON :", metrics_json)
 
 
 if __name__ == "__main__":

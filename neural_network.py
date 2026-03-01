@@ -54,7 +54,6 @@ class MLPClassifier(nn.Module):
         return self.net(x)
 
     def _init_weights(self, activation: str):
-        # Initialisation adaptée (He pour ReLU/GELU ; Xavier sinon)
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 if activation.lower() in {"relu", "gelu"}:

@@ -94,13 +94,10 @@ Le MLP avec pondération améliore significativement la Balanced Accuracy (0.676
 
 ---
 
-## 🧠 Principales conclusions
+## Principales conclusions
 
 - Les méthodes ensemblistes restent extrêmement performantes sur des données tabulaires structurées.
 - L’accuracy seule peut masquer un déséquilibre important entre classes.
 - La pondération des classes améliore l’équité de la classification.
 - Le Deep Learning ne surpasse pas automatiquement les modèles classiques sur des datasets de taille modérée.
 
----
-
-## 📂 Structure du projet

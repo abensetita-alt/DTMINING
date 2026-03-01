@@ -1,0 +1,4 @@
+Approche,Modèle,Accuracy
+Classique,RandomForest,0.8553846153846154
+DeepLearning,MLP (nocw),0.8076923076923077
+DeepLearning,MLP (cw),0.6184615384615385
